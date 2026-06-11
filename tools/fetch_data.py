@@ -26,7 +26,10 @@ OUT = os.path.join(HERE, "..", "assets", "data")
 TODAY = date.today()
 
 SBDB_URL = ("https://ssd-api.jpl.nasa.gov/sbdb_query.api"
-            "?fields=pdes,name,e,a,i,om,w,ma,epoch,H,diameter,class,pha&sb-group=neo")
+            "?fields=pdes,name,e,a,i,om,w,ma,epoch,H,diameter,class,pha,first_obs&sb-group=neo")
+SENTRY_URL = "https://ssd-api.jpl.nasa.gov/sentry.api"
+CONS_LINES_URL = "https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/constellations.lines.json"
+CONS_NAMES_URL = "https://raw.githubusercontent.com/ofrohn/d3-celestial/master/data/constellations.json"
 CAD_URL = ("https://ssd-api.jpl.nasa.gov/cad.api"
            f"?date-min={TODAY}&date-max={TODAY + timedelta(days=2760)}"
            "&dist-max=0.05&sort=date")
@@ -49,8 +52,18 @@ def build_neos(sbdb, cad_designations):
     rows = sbdb["data"]
     total_known = sbdb["count"]
 
+    def first_obs_year(s):
+        if not s:
+            return None
+        try:
+            parts = (s.split("-") + ["1", "1"])[:3]
+            y, m = int(parts[0]), int(parts[1] or 1)
+            return round(y + (m - 0.5) / 12, 2)
+        except ValueError:
+            return None
+
     def parse(row):
-        pdes, name, e, a, i, om, w, ma, epoch, H, diam, cls, pha = row
+        pdes, name, e, a, i, om, w, ma, epoch, H, diam, cls, pha, fobs = row
         try:
             return {
                 "des": pdes, "name": name or None,
@@ -59,7 +72,7 @@ def build_neos(sbdb, cad_designations):
                 "w": round(float(w), 2), "ma": round(float(ma), 2),
                 "ep": float(epoch), "H": float(H) if H else None,
                 "d": round(float(diam), 3) if diam else None,
-                "cls": cls, "pha": pha == "Y",
+                "cls": cls, "pha": pha == "Y", "fo": first_obs_year(fobs),
             }
         except (TypeError, ValueError):
             return None   # objects with incomplete orbits
@@ -91,6 +104,7 @@ def build_neos(sbdb, cad_designations):
         "ep": [o["ep"] for o in plotted], "H": [o["H"] for o in plotted],
         "d": [o["d"] for o in plotted], "cls": [o["cls"] for o in plotted],
         "pha": [1 if o["pha"] else 0 for o in plotted],
+        "fo": [o["fo"] for o in plotted],
     }
     return out
 
@@ -124,18 +138,42 @@ def build_stars(stars, names):
             "names": labels}
 
 
+def build_extras(sentry, cons_lines, cons_names):
+    risk = {}
+    for o in sentry["data"]:
+        try:
+            risk[o["des"]] = [float(o["ip"]), float(o["ps_cum"]),
+                              int(o["ts_max"]) if o["ts_max"] is not None else None,
+                              o["range"]]
+        except (TypeError, ValueError, KeyError):
+            continue
+    lines = []
+    for f in cons_lines["features"]:
+        for seg in f["geometry"]["coordinates"]:
+            lines.append([[round(p[0], 1), round(p[1], 1)] for p in seg])
+    names = [[f["properties"]["name"],
+              round(f["geometry"]["coordinates"][0], 1),
+              round(f["geometry"]["coordinates"][1], 1)]
+             for f in cons_names["features"]]
+    return {"sentry": risk, "lines": lines, "names": names}
+
+
 def main():
     sbdb = load(SBDB_URL, "sbdb.json")
     cad = load(CAD_URL, "cad.json")
     stars = load(STARS_URL, "stars8.json")
     names = load(NAMES_URL, "starnames.json")
+    sentry = load(SENTRY_URL, "sentry.json")
+    cons_l = load(CONS_LINES_URL, "conslines.json")
+    cons_n = load(CONS_NAMES_URL, "consnames.json")
 
     os.makedirs(OUT, exist_ok=True)
     cad_out = build_cad(cad)
     neos_out = build_neos(sbdb, {r[0] for r in cad_out["rows"]})
 
     for fname, data in [("neos.json", neos_out), ("cad.json", cad_out),
-                        ("stars.json", build_stars(stars, names))]:
+                        ("stars.json", build_stars(stars, names)),
+                        ("extras.json", build_extras(sentry, cons_l, cons_n))]:
         path = os.path.join(OUT, fname)
         with open(path, "w") as f:
             json.dump(data, f, separators=(",", ":"), ensure_ascii=False)

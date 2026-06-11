@@ -98,6 +98,68 @@ header > * { pointer-events: auto; }
 .chip-warn.active { color: #2b0d05; background: var(--warn); border-color: var(--warn); }
 .spacer { width: 8px; }
 
+#search-row { position: relative; }
+#search {
+  width: 220px;
+  border: 1px solid var(--border);
+  background: rgba(15, 21, 32, 0.75);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: 11px "JetBrains Mono", monospace;
+  backdrop-filter: blur(8px);
+  outline: none;
+}
+#search:focus { border-color: var(--accent); }
+#search::placeholder { color: var(--text-dim); }
+#search-results {
+  position: absolute;
+  top: 32px; right: 0;
+  width: 250px;
+  background: rgba(18, 26, 40, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  display: none;
+}
+#search-results.open { display: block; }
+.sr-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: 11px "JetBrains Mono", monospace;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.sr-row:hover { background: rgba(88, 230, 217, 0.1); color: var(--accent); }
+.sr-row i { font-style: normal; color: var(--warn); }
+.sr-row span { color: var(--text-dim); }
+
+#ticker {
+  position: fixed;
+  left: 50%;
+  bottom: 66px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  background: rgba(15, 21, 32, 0.8);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: 11px "JetBrains Mono", monospace;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+#ticker:hover { border-color: var(--accent); }
+#ticker b { color: var(--accent); font-weight: 600; }
+#ticker i { font-style: normal; color: var(--warn); }
+
 .lang-switch {
   display: flex;
   border: 1px solid var(--border);
@@ -328,7 +390,8 @@ header > * { pointer-events: auto; }
   .stats { display: none; }
   #brand-title { font-size: 16px; }
   .chip { padding: 4px 9px; font-size: 10px; }
-  #hint, #sources { display: none; }
+  #hint, #sources, #ticker { display: none; }
+  #search { width: 150px; }
   #ca-panel { width: calc(100vw - 24px); left: 12px; }
   #card { top: auto; bottom: 130px; right: 12px; left: 12px; width: auto; }
 }

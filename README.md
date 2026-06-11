@@ -20,11 +20,15 @@ three stacked 2D canvases and Kepler's equation at 60 fps.
 ## ✨ Features
 
 - ☄️ **The swarm** — 6,834 NEOs with real orbital elements from [JPL SBDB](https://ssd.jpl.nasa.gov/tools/sbdb_query.html); motion-blur trails make the orbital flow visible; filter to PHAs only
+- 🔭 **Discovery timeline** — switch to *discovery* view and start in 1980: asteroids flash teal the moment they were actually found, and the swarm grows from a handful of rocks to thousands — eight decades of planetary defense in a minute
 - 🌍 **Close approaches** — all **1,054 known passes within 0.05 au through 2033** from [JPL CNEOS](https://cneos.jpl.nasa.gov/ca/); click one and *watch it happen*: the clock jumps to 12 days before the pass, the camera locks onto Earth
-- ⭐ **Real stars** — the full BSC5/HYG catalog to magnitude 8.5 (41,411 stars), converted to ecliptic coordinates, colored by B−V index, with 99 proper names — Sirius is where Sirius belongs
-- 🔭 **Pick any rock** — click an asteroid for live numbers: distance from Sun and Earth (in lunar distances), orbit class, period, H magnitude, diameter (measured, or estimated from H)
-- 🎥 **3D orbit camera** — drag to orbit, scroll/pinch to zoom, focus on the Sun or Earth
-- ⏱️ **Time travel** — 1 day/s to 10 years/s, reverse, date picker
+- ⚠️ **Impact monitoring** — objects on [JPL Sentry](https://cneos.jpl.nasa.gov/sentry/) carry a risk badge with cumulative impact probability, Palermo/Torino scales and possible impact years
+- ⭐ **The real sky** — the full BSC5/HYG catalog to magnitude 8.5 (41,411 stars) with 99 proper names, plus all 88 constellations drawn as stick figures — Sirius is where Sirius belongs
+- 🌙 **Sense of scale** — lunar-distance rings (1 / 5 / 20 LD) around Earth and the actual Moon on its orbit, so a "close" approach means something
+- 🔎 **Search** — find any of the 6,834 rocks by name or designation (try *Apophis*, *Bennu*, *Eros*); one button jumps straight to the famous **April 13, 2029 Apophis flyby**
+- 📡 **Live ticker** — which plotted object is closest to Earth *right now*, in lunar distances, every frame
+- 🎥 **3D orbit camera** — drag to orbit, scroll/pinch to zoom, focus on the Sun or Earth; keyboard: `space` `←→` `r` `t` `e` `esc`
+- 🔗 **Shareable views** — date, selection and mode live in the URL hash
 - 🌐 **Bilingual** — EN/TR, auto-detected, persisted
 
 ## 🔬 How it works
@@ -45,8 +49,10 @@ through the identical camera — so the swarm and the sky rotate together, like 
 |---|---|---|
 | NEO orbital elements (42,025 objects) | [JPL Small-Body Database Query API](https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html) | `assets/data/neos.json` |
 | Close approaches ≤ 0.05 au → 2033 | [JPL CNEOS Close-Approach API](https://ssd-api.jpl.nasa.gov/doc/cad.html) | `assets/data/cad.json` |
+| Impact risk (2,154 objects) | [JPL Sentry API](https://ssd-api.jpl.nasa.gov/doc/sentry.html) | `assets/data/extras.json` |
 | Star catalog, mag ≤ 8.5 | [d3-celestial](https://github.com/ofrohn/d3-celestial) (BSC5 / HYG derived) | `assets/data/stars.json` |
-| Planet orbits | [JPL approximate planetary positions](https://ssd.jpl.nasa.gov/planets/approx_pos.html) | inline |
+| Constellation figures (88) | [d3-celestial](https://github.com/ofrohn/d3-celestial) | `assets/data/extras.json` |
+| Planet orbits + Moon | [JPL approximate planetary positions](https://ssd.jpl.nasa.gov/planets/approx_pos.html) | inline |
 
 The snapshot is reproducible — refresh it any time:
 

@@ -1,5 +1,10 @@
 "use strict";
 
+window.addEventListener("error", (e) =>
+  console.error("[neo-swarm]", e.message, e.filename, e.lineno));
+window.addEventListener("unhandledrejection", (e) =>
+  console.error("[neo-swarm]", String((e.reason && e.reason.stack) || e.reason)));
+
 /* ================= constants ================= */
 
 const J2000 = 2451545.0;
@@ -51,7 +56,14 @@ const I18N = {
     semiMajor: "Semi-major axis", ecc: "Eccentricity", inc: "Inclination",
     period: "Orbital period", hmag: "Abs. magnitude H", diameter: "Diameter", diamEst: "Diameter (est.)",
     rSun: "Distance from Sun", dEarth: "Distance from Earth", nextCa: "Next close pass",
-    yearsUnit: "y", daysUnit: "d", pha: "PHA — potentially hazardous", neo: "NEO"
+    yearsUnit: "y", daysUnit: "d", pha: "PHA — potentially hazardous", neo: "NEO",
+    consToggle: "lines", viewLabel: "view", viewNow: "now", viewDiscovery: "discovery",
+    search: "search 6,834 asteroids…", noResults: "no match",
+    ticker: (des, ld) => `☄ closest to Earth now: <b>${des}</b> · <i>${ld} LD</i>`,
+    discoveryStats: (n, total, year) => `<b>${n}</b> of <b>${total}</b> plotted NEOs discovered by <b>${year}</b><br>teal flash = newly discovered`,
+    sentry: "Sentry — impact monitored", ip: "Impact probability (cum.)", oneIn: "1 in",
+    palermo: "Palermo scale (cum.)", torino: "Torino scale (max.)", impactYears: "Possible impacts",
+    moon: "Moon"
   },
   tr: {
     eyebrow: "NASA/JPL Küçük Cisimler Veritabanı · çekim ",
@@ -71,7 +83,14 @@ const I18N = {
     semiMajor: "Yarı-büyük eksen", ecc: "Dışmerkezlik", inc: "Eğiklik",
     period: "Yörünge periyodu", hmag: "Mutlak parlaklık H", diameter: "Çap", diamEst: "Çap (tahmini)",
     rSun: "Güneş'e uzaklık", dEarth: "Dünya'ya uzaklık", nextCa: "Sonraki yakın geçiş",
-    yearsUnit: "y", daysUnit: "g", pha: "PHA — potansiyel tehlikeli", neo: "NEO"
+    yearsUnit: "y", daysUnit: "g", pha: "PHA — potansiyel tehlikeli", neo: "NEO",
+    consToggle: "çizgiler", viewLabel: "görünüm", viewNow: "şimdi", viewDiscovery: "keşif",
+    search: "6.834 asteroit içinde ara…", noResults: "sonuç yok",
+    ticker: (des, ld) => `☄ şu an Dünya'ya en yakın: <b>${des}</b> · <i>${ld} AyU</i>`,
+    discoveryStats: (n, total, year) => `<b>${year}</b> itibarıyla çizilen NEO'ların <b>${n}</b>/<b>${total}</b>'i keşfedilmişti<br>turkuaz parlama = yeni keşif`,
+    sentry: "Sentry — çarpışma izlemede", ip: "Çarpışma olasılığı (küm.)", oneIn: "1 /",
+    palermo: "Palermo ölçeği (küm.)", torino: "Torino ölçeği (maks.)", impactYears: "Olası çarpışmalar",
+    moon: "Ay"
   }
 };
 
@@ -91,15 +110,19 @@ let speedIdx = 2;
 let direction = 1;
 let swarmMode = "all";      // all | pha | off
 let starMode = "bright";    // bright | all | off
+let consOn = true;
+let viewMode = "now";       // now | discovery
 let focusEarth = false;
 let selected = -1;          // asteroid index
 let cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 };
 let W = 0, H = 0, dpr = 1, fov = 0;
 
-let NEO = null, CAD = null, STARS = null;
+let NEO = null, CAD = null, STARS = null, EXTRAS = null;
 let ast = null;             // typed-array bundle
-let starsArr = null;
+let starsArr = null, consArr = null;
 let caByDes = new Map();
+let earthNow = { x: 0, y: 0, z: 0 };
+let closestIdx = -1, closestD = 1e9, discoveredCount = 0;
 
 const t = (k) => I18N[lang][k];
 const $ = (id) => document.getElementById(id);
@@ -142,6 +165,24 @@ function planetPos(p, jd) {
   };
 }
 
+// Low-precision lunar position (geocentric ecliptic, ~0.3° accuracy) — plenty
+// for visualising the Moon's orbit at close-approach scale.
+function moonPos(jd, earth) {
+  const d = jd - J2000;
+  const L = (218.316 + 13.176396 * d) * DEG;     // mean longitude
+  const M = (134.963 + 13.064993 * d) * DEG;     // mean anomaly
+  const F = (93.272 + 13.229350 * d) * DEG;      // argument of latitude
+  const lon = L + 6.289 * DEG * Math.sin(M);
+  const lat = 5.128 * DEG * Math.sin(F);
+  const r = (385001 - 20905 * Math.cos(M)) / 149597870.7;
+  return {
+    x: earth.x + r * Math.cos(lat) * Math.cos(lon),
+    y: earth.y + r * Math.cos(lat) * Math.sin(lon),
+    z: earth.z + r * Math.sin(lat),
+    r
+  };
+}
+
 /* ================= data ================= */
 
 function prepAsteroids() {
@@ -154,7 +195,8 @@ function prepAsteroids() {
     nn: new Float64Array(n), M0: new Float64Array(n), ep: new Float64Array(n),
     pha: new Uint8Array(n), ok: new Uint8Array(n),
     sx: new Float32Array(n), sy: new Float32Array(n), vis: new Uint8Array(n),
-    wx: new Float64Array(n), wy: new Float64Array(n), wz: new Float64Array(n)
+    wx: new Float64Array(n), wy: new Float64Array(n), wz: new Float64Array(n),
+    fo: new Float32Array(n)
   };
   for (let i = 0; i < n; i++) {
     const a = NEO.a[i], e = NEO.e[i];
@@ -169,7 +211,21 @@ function prepAsteroids() {
     ast.nn[i] = GAUSS / Math.pow(a, 1.5);
     ast.M0[i] = NEO.ma[i] * DEG; ast.ep[i] = NEO.ep[i];
     ast.pha[i] = NEO.pha[i]; ast.ok[i] = 1;
+    ast.fo[i] = NEO.fo[i] || 0;
   }
+}
+
+function prepCons() {
+  const ce = Math.cos(OBLIQUITY), se = Math.sin(OBLIQUITY);
+  const toDir = (ra, dec) => {
+    const r = ra * DEG, q = dec * DEG;
+    const cx = Math.cos(q) * Math.cos(r), cy = Math.cos(q) * Math.sin(r), cz = Math.sin(q);
+    return [cx * 1000, (cy * ce + cz * se) * 1000, (-cy * se + cz * ce) * 1000];
+  };
+  consArr = {
+    lines: EXTRAS.lines.map((seg) => seg.map((p) => toDir(p[0], p[1]))),
+    names: EXTRAS.names.map(([name, ra, dec]) => [name, ...toDir(ra, dec)])
+  };
 }
 
 function prepStars() {
@@ -236,6 +292,27 @@ function project(x, y, z) {
 function drawStars() {
   starsCx.clearRect(0, 0, W, H);
   if (starMode === "off" || !starsArr) return;
+  if (consOn && consArr) {
+    starsCx.strokeStyle = "rgba(124,140,255,0.22)";
+    starsCx.lineWidth = 1;
+    for (const seg of consArr.lines) {
+      starsCx.beginPath();
+      let started = false;
+      for (const v of seg) {
+        const p = project(v[0] + tgt.x, v[1] + tgt.y, v[2] + tgt.z);
+        if (!p) { started = false; continue; }
+        started ? starsCx.lineTo(p[0], p[1]) : starsCx.moveTo(p[0], p[1]);
+        started = true;
+      }
+      starsCx.stroke();
+    }
+    starsCx.fillStyle = "rgba(124,140,255,0.45)";
+    starsCx.font = "10px 'JetBrains Mono', monospace";
+    for (const [name, x, y, z] of consArr.names) {
+      const p = project(x + tgt.x, y + tgt.y, z + tgt.z);
+      if (p) starsCx.fillText(name, p[0], p[1]);
+    }
+  }
   const set = starsArr.buckets[starMode];
   const d = starsArr.dir;
   for (const b of set) {
@@ -283,9 +360,24 @@ function drawSwarm(jd) {
     trailCx.fillStyle = p.color;
     trailCx.beginPath(); trailCx.arc(q[0], q[1], Math.max(1.4, r), 0, 7); trailCx.fill();
   }
+  earthNow = PLANETS[2].world;
+
+  // the Moon, once the camera is close enough for it to mean something
+  if (cam.dist < 0.6) {
+    const m = moonPos(jd, earthNow);
+    const q = project(m.x, m.y, m.z);
+    if (q) {
+      trailCx.fillStyle = "#c8ccd4";
+      trailCx.beginPath(); trailCx.arc(q[0], q[1], 1.6, 0, 7); trailCx.fill();
+    }
+  }
 
   if (swarmMode === "off" || !ast) return;
   const phaOnly = swarmMode === "pha";
+  const discovery = viewMode === "discovery";
+  const simYear = 2000 + (jd - J2000) / 365.25;
+  const fresh = [];
+  closestIdx = -1; closestD = 1e9; discoveredCount = 0;
 
   // two passes -> one fillStyle each
   for (let pass = 0; pass < 2; pass++) {
@@ -295,6 +387,8 @@ function drawSwarm(jd) {
     const s = wantPha ? 1.9 : 1.3;
     for (let i = 0; i < ast.n; i++) {
       if (!ast.ok[i] || ast.pha[i] !== (wantPha ? 1 : 0)) { if (!wantPha) ast.vis[i] = 0; continue; }
+      if (discovery && ast.fo[i] > simYear) { ast.vis[i] = 0; continue; }
+      if (discovery) discoveredCount++;
       let M = (ast.M0[i] + ast.nn[i] * (jd - ast.ep[i])) % (2 * Math.PI);
       const e = ast.e[i];
       const E = kepler(M, e);
@@ -303,11 +397,21 @@ function drawSwarm(jd) {
       const wy = ast.C[i] * xp + ast.D[i] * yp;
       const wz = ast.E[i] * xp + ast.F[i] * yp;
       ast.wx[i] = wx; ast.wy[i] = wy; ast.wz[i] = wz;
+      const dx = wx - earthNow.x, dy = wy - earthNow.y, dz = wz - earthNow.z;
+      const dE2 = dx * dx + dy * dy + dz * dz;
+      if (dE2 < closestD) { closestD = dE2; closestIdx = i; }
       const q = project(wx, wy, wz);
       if (!q) { ast.vis[i] = 0; continue; }
       ast.vis[i] = 1; ast.sx[i] = q[0]; ast.sy[i] = q[1];
+      if (discovery && simYear - ast.fo[i] < 1.5) { fresh.push(i); continue; }
       trailCx.fillRect(q[0], q[1], s, s);
     }
+  }
+
+  // newly discovered objects flash teal, then settle into the swarm
+  if (fresh.length) {
+    trailCx.fillStyle = "rgba(88,230,217,0.95)";
+    for (const i of fresh) trailCx.fillRect(ast.sx[i] - 1, ast.sy[i] - 1, 2.6, 2.6);
   }
 }
 
@@ -325,6 +429,36 @@ function drawTop(jd) {
     if (!p.screen) continue;
     topCx.fillStyle = p.key === "earth" ? "rgba(79,157,247,0.95)" : "rgba(139,155,180,0.8)";
     topCx.fillText(names[p.key], p.screen[0] + 7, p.screen[1] - 7);
+  }
+
+  // lunar-distance rings around Earth: the yardstick of every close approach
+  if (focusEarth && cam.dist < 0.6) {
+    topCx.strokeStyle = "rgba(88,230,217,0.28)";
+    topCx.fillStyle = "rgba(88,230,217,0.6)";
+    topCx.lineWidth = 1;
+    topCx.setLineDash([2, 5]);
+    for (const ld of [1, 5, 20]) {
+      const r = ld * LD_AU;
+      topCx.beginPath();
+      let started = false;
+      for (let k = 0; k <= 90; k++) {
+        const th = k / 90 * 2 * Math.PI;
+        const q = project(earthNow.x + r * Math.cos(th), earthNow.y + r * Math.sin(th), earthNow.z);
+        if (!q) { started = false; continue; }
+        started ? topCx.lineTo(q[0], q[1]) : topCx.moveTo(q[0], q[1]);
+        started = true;
+      }
+      topCx.stroke();
+      const lp = project(earthNow.x + r * 0.7071, earthNow.y + r * 0.7071, earthNow.z);
+      if (lp) topCx.fillText(`${ld} LD`, lp[0] + 4, lp[1] - 4);
+    }
+    topCx.setLineDash([]);
+    const m = moonPos(jd, earthNow);
+    const mq = project(m.x, m.y, m.z);
+    if (mq && cam.dist < 0.15) {
+      topCx.fillStyle = "rgba(200,204,212,0.85)";
+      topCx.fillText(t("moon"), mq[0] + 6, mq[1] - 6);
+    }
   }
 
   if (selected >= 0 && ast.ok[selected]) {
@@ -398,6 +532,15 @@ function updateCard(jd) {
       `${d.toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US", { year: "numeric", month: "short", day: "numeric" })}` +
       ` · ${fmt(ca[2] / LD_AU, 1)} LD · ${fmt(ca[3], 1)} km/s`, "warn");
   }
+  const sentry = EXTRAS.sentry[NEO.des[i]];
+  if (sentry) {
+    const [ip, ps, ts, range] = sentry;
+    html +=
+      row(t("ip"), `${t("oneIn")} ${fmtInt(1 / ip)}`, "warn") +
+      row(t("palermo"), fmt(ps, 2)) +
+      (ts != null ? row(t("torino"), String(ts)) : "") +
+      row(t("impactYears"), range);
+  }
   $("card-body").innerHTML = html;
 }
 
@@ -411,11 +554,13 @@ function select(i) {
   const cls = CLASS_NAMES[NEO.cls[i]] || NEO.cls[i];
   $("card-badges").innerHTML =
     `<span class="badge">${cls}</span>` +
-    (NEO.pha[i] ? `<span class="badge pha">${t("pha")}</span>` : `<span class="badge">${t("neo")}</span>`);
+    (NEO.pha[i] ? `<span class="badge pha">${t("pha")}</span>` : `<span class="badge">${t("neo")}</span>`) +
+    (EXTRAS.sentry[NEO.des[i]] ? `<span class="badge pha">⚠ ${t("sentry")}</span>` : "");
   const ca = caByDes.get(NEO.des[i]);
   $("card-watch").classList.toggle("show", !!ca);
   const rowEl = document.querySelector(`.ca-row[data-des="${CSS.escape(NEO.des[i])}"]`);
   if (rowEl) rowEl.classList.add("sel");
+  writeHash();
 }
 
 function buildCaList() {
@@ -459,8 +604,13 @@ function applyLang() {
   });
   const sw = document.querySelectorAll("#swarm-chips .chip");
   sw[0].textContent = t("swarmAll"); sw[1].textContent = t("swarmPha"); sw[2].textContent = t("swarmOff");
-  const st = document.querySelectorAll("#star-chips .chip");
+  const st = document.querySelectorAll("#star-chips .chip:not(#cons-toggle)");
   st[0].textContent = t("starsBright"); st[1].textContent = t("starsAll"); st[2].textContent = t("starsOff");
+  $("cons-toggle").textContent = `✦ ${t("consToggle")}`;
+  const tc = document.querySelectorAll("#time-chips .chip");
+  tc[0].textContent = t("viewNow"); tc[1].textContent = t("viewDiscovery");
+  $("view-label").textContent = t("viewLabel");
+  $("search").placeholder = t("search");
   $("star-label").textContent = t("starLabel");
   $("focus-label").textContent = t("focusLabel");
   $("ca-toggle").textContent = `☄ ${t("caToggle")} (${fmtInt(CAD.count)})`;
@@ -475,13 +625,27 @@ function applyLang() {
   if (selected >= 0) select(selected);
 }
 
-function updateHud() {
+let hudT = 0;
+function updateHud(now) {
   $("date-label").textContent = simDate.toLocaleDateString(
     lang === "tr" ? "tr-TR" : "en-US", { year: "numeric", month: "short", day: "numeric" });
   const dps = SPEEDS[speedIdx] * direction;
   $("speed-label").textContent = !playing ? t("paused")
     : Math.abs(dps) >= 365 ? `${dps > 0 ? "+" : "−"}${fmt(Math.abs(dps) / 365, 0)}${t("years")}${t("perSecond")}`
     : `${dps > 0 ? "+" : "−"}${Math.abs(dps)}${t("days")}${t("perSecond")}`;
+
+  if (now - hudT < 250) return;   // ticker + discovery counter, 4x/s is plenty
+  hudT = now;
+  if (closestIdx >= 0) {
+    $("ticker").innerHTML = I18N[lang].ticker(
+      NEO.name[closestIdx] || NEO.des[closestIdx],
+      fmt(Math.sqrt(closestD) / LD_AU, 1));
+    $("ticker").dataset.idx = closestIdx;
+  }
+  if (viewMode === "discovery") {
+    $("stats").innerHTML = I18N[lang].discoveryStats(
+      fmtInt(discoveredCount), fmtInt(NEO.plotted), simDate.getFullYear());
+  }
 }
 
 function setFocus(earth) {
@@ -489,16 +653,102 @@ function setFocus(earth) {
   $("focus-sun").classList.toggle("active", !earth);
   $("focus-earth").classList.toggle("active", earth);
   if (earth) cam.dist = Math.min(cam.dist, 1.2);
+  writeHash();
 }
 
 function chipGroup(rootId, set) {
-  document.querySelectorAll(`#${rootId} .chip`).forEach((b) => {
+  document.querySelectorAll(`#${rootId} .chip[data-mode]`).forEach((b) => {
     b.addEventListener("click", () => {
-      document.querySelectorAll(`#${rootId} .chip`).forEach((x) => x.classList.remove("active"));
+      document.querySelectorAll(`#${rootId} .chip[data-mode]`).forEach((x) => x.classList.remove("active"));
       b.classList.add("active");
       set(b.dataset.mode);
     });
   });
+}
+
+/* ================= search ================= */
+
+let searchIndex = null;
+
+function buildSearch() {
+  searchIndex = [];
+  for (let i = 0; i < NEO.des.length; i++) {
+    searchIndex.push([((NEO.name[i] || "") + " " + NEO.des[i]).toLowerCase(), i]);
+  }
+  const box = $("search"), out = $("search-results");
+  box.addEventListener("input", () => {
+    const q = box.value.trim().toLowerCase();
+    if (q.length < 2) { out.classList.remove("open"); return; }
+    const hits = [];
+    for (const [key, i] of searchIndex) {
+      if (key.includes(q)) { hits.push(i); if (hits.length >= 8) break; }
+    }
+    out.innerHTML = hits.map((i) =>
+      `<button class="sr-row" data-i="${i}"><b>${NEO.name[i] || NEO.des[i]}</b>` +
+      `${NEO.pha[i] ? "<i>PHA</i>" : ""}<span>${NEO.cls[i]}</span></button>`).join("")
+      || `<div class="sr-row"><span>${t("noResults")}</span></div>`;
+    out.classList.toggle("open", true);
+  });
+  out.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-i]");
+    if (!b) return;
+    select(+b.dataset.i);
+    out.classList.remove("open");
+    box.value = "";
+    box.blur();
+  });
+  box.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") { out.classList.remove("open"); box.blur(); }
+    if (ev.key === "Enter") {
+      const first = out.querySelector("[data-i]");
+      if (first) first.click();
+    }
+  });
+  document.addEventListener("pointerdown", (ev) => {
+    if (!ev.target.closest("#search-row")) out.classList.remove("open");
+  });
+}
+
+/* ================= shareable state ================= */
+
+function writeHash() {
+  const parts = [`d=${simDate.toISOString().slice(0, 10)}`];
+  if (selected >= 0) parts.push(`sel=${encodeURIComponent(NEO.des[selected])}`);
+  if (focusEarth) parts.push("f=e");
+  if (viewMode === "discovery") parts.push("v=d");
+  history.replaceState(null, "", "#" + parts.join("&"));
+}
+
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("d")) {
+    const d = new Date(h.get("d") + "T12:00:00");
+    if (!isNaN(d)) simDate = d;
+  }
+  if (h.get("f") === "e") setFocus(true);
+  if (h.get("v") === "d") setViewMode("discovery", false);
+  if (h.get("sel")) {
+    const i = NEO.des.indexOf(decodeURIComponent(h.get("sel")));
+    if (i >= 0) select(i);
+  }
+}
+
+function setViewMode(m, jump = true) {
+  viewMode = m;
+  document.querySelectorAll("#time-chips .chip[data-mode]").forEach((x) =>
+    x.classList.toggle("active", x.dataset.mode === m));
+  if (m === "discovery" && jump) {
+    simDate = new Date("1980-01-01T12:00:00");
+    speedIdx = 4; direction = 1; playing = true;   // 1 year/s
+    $("speed").value = 4;
+    setFocus(false);
+    cam.dist = Math.max(cam.dist, 3.5);
+  }
+  if (m === "now") {
+    if (jump) { simDate = new Date(); speedIdx = 2; $("speed").value = 2; }
+    applyLang();   // restore the normal stats line
+  }
+  writeHash();
 }
 
 /* ================= interaction ================= */
@@ -564,6 +814,39 @@ $("lang-en").addEventListener("click", () => { lang = "en"; localStorage.setItem
 $("lang-tr").addEventListener("click", () => { lang = "tr"; localStorage.setItem("neo-lang", "tr"); applyLang(); });
 chipGroup("swarm-chips", (m) => { swarmMode = m; });
 chipGroup("star-chips", (m) => { starMode = m; });
+chipGroup("time-chips", (m) => setViewMode(m));
+$("cons-toggle").addEventListener("click", () => {
+  consOn = !consOn;
+  $("cons-toggle").classList.toggle("active", consOn);
+});
+$("ticker").addEventListener("click", () => {
+  const i = +$("ticker").dataset.idx;
+  if (i >= 0) select(i);
+});
+$("btn-apophis").addEventListener("click", () => {
+  const i = NEO.des.indexOf("99942");
+  if (i < 0) return;
+  select(i);
+  simDate = new Date("2029-04-01T12:00:00");
+  speedIdx = 0; direction = 1; playing = true;
+  $("speed").value = 0;
+  setFocus(true);
+  cam.dist = 0.35;
+  writeHash();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  switch (e.key) {
+    case " ": e.preventDefault(); $("btn-play").click(); break;
+    case "ArrowRight": speedIdx = Math.min(SPEEDS.length - 1, speedIdx + 1); $("speed").value = speedIdx; break;
+    case "ArrowLeft": speedIdx = Math.max(0, speedIdx - 1); $("speed").value = speedIdx; break;
+    case "r": $("btn-dir").click(); break;
+    case "t": $("btn-today").click(); break;
+    case "e": setFocus(!focusEarth); break;
+    case "Escape": select(-1); break;
+  }
+});
 
 function syncDate() {
   $("date-input").value = simDate.toISOString().slice(0, 10);
@@ -594,7 +877,7 @@ function loop(now) {
   drawStars();
   drawSwarm(jd);
   drawTop(jd);
-  updateHud();
+  updateHud(now);
   requestAnimationFrame(loop);
 }
 
@@ -604,14 +887,18 @@ $("loading").querySelector("span").textContent =
 Promise.all([
   fetch("assets/data/neos.json").then((r) => r.json()),
   fetch("assets/data/cad.json").then((r) => r.json()),
-  fetch("assets/data/stars.json").then((r) => r.json())
-]).then(([neo, cad, stars]) => {
-  NEO = neo; CAD = cad; STARS = stars;
+  fetch("assets/data/stars.json").then((r) => r.json()),
+  fetch("assets/data/extras.json").then((r) => r.json())
+]).then(([neo, cad, stars, extras]) => {
+  NEO = neo; CAD = cad; STARS = stars; EXTRAS = extras;
   prepAsteroids();
   prepStars();
+  prepCons();
   buildCaList();
+  buildSearch();
   resize();
   applyLang();
+  readHash();
   syncDate();
   $("loading").classList.add("done");
   requestAnimationFrame(loop);

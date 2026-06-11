@@ -23,6 +23,10 @@
       <div id="stats" class="stats"></div>
     </div>
     <div class="header-right">
+      <div class="chip-row" id="search-row">
+        <input id="search" type="search" autocomplete="off" spellcheck="false">
+        <div id="search-results"></div>
+      </div>
       <div class="chip-row" id="swarm-chips">
         <button data-mode="all" class="chip active"></button>
         <button data-mode="pha" class="chip chip-warn"></button>
@@ -33,6 +37,12 @@
         <button data-mode="bright" class="chip active"></button>
         <button data-mode="all" class="chip"></button>
         <button data-mode="off" class="chip"></button>
+        <button id="cons-toggle" class="chip active"></button>
+      </div>
+      <div class="chip-row" id="time-chips">
+        <span class="chip-label" id="view-label"></span>
+        <button data-mode="now" class="chip active"></button>
+        <button data-mode="discovery" class="chip"></button>
       </div>
       <div class="chip-row">
         <span class="chip-label" id="focus-label"></span>
@@ -71,6 +81,7 @@
 
   <div id="hint"></div>
   <div id="sources"></div>
+  <button id="ticker" type="button"></button>
   <div id="loading"><span></span></div>
 
   <div id="controls">
@@ -81,6 +92,7 @@
     <span id="date-label"></span>
     <input id="date-input" type="date" aria-label="date">
     <button id="btn-today" type="button"></button>
+    <button id="btn-apophis" type="button">✦ Apophis '29</button>
   </div>
 
   <script src="assets/app.js"></script>
