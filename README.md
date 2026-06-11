@@ -27,7 +27,11 @@ three stacked 2D canvases and Kepler's equation at 60 fps.
 - 🌙 **Sense of scale** — lunar-distance rings (1 / 5 / 20 LD) around Earth and the actual Moon on its orbit, so a "close" approach means something
 - 🔎 **Search** — find any of the 6,834 rocks by name or designation (try *Apophis*, *Bennu*, *Eros*); one button jumps straight to the famous **April 13, 2029 Apophis flyby**
 - 📡 **Live ticker** — which plotted object is closest to Earth *right now*, in lunar distances, every frame
-- 🎥 **3D orbit camera** — drag to orbit, scroll/pinch to zoom, focus on the Sun or Earth; keyboard: `space` `←→` `r` `t` `e` `esc`
+- 🎬 **Guided tour** — six narrated stops, from the full swarm to the 2029 Apophis flyby to the discovery timeline; sit back or skip ahead
+- 🎨 **Two color modes** — *danger* (PHAs glow) or *type*: Apollo / Aten / Amor / Atira orbit classes, each in its own color with a legend
+- 💥 **Impact energy** — every card carries a back-of-envelope kinetic-energy estimate (rocky density + encounter velocity), in megatons and × Hiroshima
+- 🎥 **3D orbit camera** — drag to orbit, scroll/pinch to zoom, focus on the Sun or Earth; depth-scaled points for real parallax; keyboard: `space` `←→` `r` `t` `e` `esc`
+- 📷 **One-click PNG export** of the current view
 - 🔗 **Shareable views** — date, selection and mode live in the URL hash
 - 🌐 **Bilingual** — EN/TR, auto-detected, persisted
 

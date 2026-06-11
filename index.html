@@ -44,6 +44,11 @@
         <button data-mode="now" class="chip active"></button>
         <button data-mode="discovery" class="chip"></button>
       </div>
+      <div class="chip-row" id="color-chips">
+        <span class="chip-label" id="color-label"></span>
+        <button data-mode="danger" class="chip active"></button>
+        <button data-mode="class" class="chip"></button>
+      </div>
       <div class="chip-row">
         <span class="chip-label" id="focus-label"></span>
         <button id="focus-sun" class="chip active">☉</button>
@@ -81,7 +86,18 @@
 
   <div id="hint"></div>
   <div id="sources"></div>
+  <div id="legend"></div>
   <button id="ticker" type="button"></button>
+  <div id="tour">
+    <div id="tour-text"></div>
+    <div id="tour-foot">
+      <span id="tour-dots"></span>
+      <span>
+        <button id="tour-skip" type="button"></button>
+        <button id="tour-exit" type="button"></button>
+      </span>
+    </div>
+  </div>
   <div id="loading"><span></span></div>
 
   <div id="controls">
@@ -93,6 +109,8 @@
     <input id="date-input" type="date" aria-label="date">
     <button id="btn-today" type="button"></button>
     <button id="btn-apophis" type="button">✦ Apophis '29</button>
+    <button id="btn-tour" type="button"></button>
+    <button id="btn-shot" type="button" aria-label="screenshot">📷</button>
   </div>
 
   <script src="assets/app.js"></script>

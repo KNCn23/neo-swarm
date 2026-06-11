@@ -36,6 +36,9 @@ const PLANETS = [
 ];
 
 const CLASS_NAMES = { APO: "Apollo", ATE: "Aten", AMO: "Amor", IEO: "Atira" };
+const CLASS_ORDER = ["APO", "ATE", "AMO", "IEO"];
+const CLASS_COLORS = ["rgba(255,122,92,0.7)", "rgba(88,230,217,0.8)", "rgba(124,140,255,0.7)", "rgba(232,196,104,0.9)"];
+const CLASS_HEX = ["#ff7a5c", "#58e6d9", "#7c8cff", "#e8c468"];
 
 const I18N = {
   en: {
@@ -63,7 +66,18 @@ const I18N = {
     discoveryStats: (n, total, year) => `<b>${n}</b> of <b>${total}</b> plotted NEOs discovered by <b>${year}</b><br>teal flash = newly discovered`,
     sentry: "Sentry — impact monitored", ip: "Impact probability (cum.)", oneIn: "1 in",
     palermo: "Palermo scale (cum.)", torino: "Torino scale (max.)", impactYears: "Possible impacts",
-    moon: "Moon"
+    moon: "Moon",
+    colorLabel: "color", colorDanger: "danger", colorClass: "type",
+    energy: "Impact energy (est.)", hiro: "× Hiroshima",
+    tourBtn: "🎬 tour", tourSkip: "next →", tourExit: "exit ×",
+    tourCaps: [
+      "42,026 known near-Earth asteroids. 6,834 of them are moving on this screen right now — every orbit is real, from NASA/JPL.",
+      "These are the 2,540 potentially hazardous ones: larger than ~140 m, crossing within 0.05 au of Earth's orbit. We are watching all of them.",
+      "April 13, 2029 — Apophis, 340 m wide, slides closer to Earth than our own geostationary satellites. Watch the teal orbit thread the rings.",
+      "Bennu. OSIRIS-REx brought a piece of it home; Sentry still keeps it on the watchlist into the 2300s.",
+      "Rewind to 1980 and let it run: every teal flash is a real discovery, on its real date. Four decades of planetary defense in a minute.",
+      "And all of it happens in front of 41,411 real stars and 88 constellations. Drag the sky. It's yours."
+    ]
   },
   tr: {
     eyebrow: "NASA/JPL Küçük Cisimler Veritabanı · çekim ",
@@ -90,7 +104,18 @@ const I18N = {
     discoveryStats: (n, total, year) => `<b>${year}</b> itibarıyla çizilen NEO'ların <b>${n}</b>/<b>${total}</b>'i keşfedilmişti<br>turkuaz parlama = yeni keşif`,
     sentry: "Sentry — çarpışma izlemede", ip: "Çarpışma olasılığı (küm.)", oneIn: "1 /",
     palermo: "Palermo ölçeği (küm.)", torino: "Torino ölçeği (maks.)", impactYears: "Olası çarpışmalar",
-    moon: "Ay"
+    moon: "Ay",
+    colorLabel: "renk", colorDanger: "tehlike", colorClass: "tür",
+    energy: "Çarpma enerjisi (tahmini)", hiro: "× Hiroşima",
+    tourBtn: "🎬 tur", tourSkip: "sonraki →", tourExit: "çık ×",
+    tourCaps: [
+      "Bilinen 42.026 yakın-Dünya asteroidi. 6.834'ü şu anda bu ekranda hareket ediyor — her yörünge gerçek, NASA/JPL'den.",
+      "Bunlar potansiyel tehlikeli 2.540 tanesi: ~140 m'den büyük ve Dünya yörüngesine 0,05 au'dan fazla yaklaşanlar. Hepsini izliyoruz.",
+      "13 Nisan 2029 — 340 metrelik Apophis, kendi sabit yörünge uydularımızdan bile yakın geçecek. Turkuaz yörüngenin halkaların arasından geçişini izle.",
+      "Bennu. OSIRIS-REx ondan bir parçayı eve getirdi; Sentry onu 2300'lere kadar izleme listesinde tutuyor.",
+      "1980'e sar ve bırak aksın: her turkuaz parlama, gerçek tarihinde gerçek bir keşif. Kırk yıllık gezegen savunması bir dakikada.",
+      "Ve hepsi 41.411 gerçek yıldız ile 88 takımyıldızın önünde oluyor. Gökyüzünü sürükle. Senin artık."
+    ]
   }
 };
 
@@ -112,6 +137,8 @@ let swarmMode = "all";      // all | pha | off
 let starMode = "bright";    // bright | all | off
 let consOn = true;
 let viewMode = "now";       // now | discovery
+let colorMode = "danger";   // danger | class
+let tourIdx = -1, tourTimer = null;
 let focusEarth = false;
 let selected = -1;          // asteroid index
 let cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 };
@@ -196,7 +223,7 @@ function prepAsteroids() {
     pha: new Uint8Array(n), ok: new Uint8Array(n),
     sx: new Float32Array(n), sy: new Float32Array(n), vis: new Uint8Array(n),
     wx: new Float64Array(n), wy: new Float64Array(n), wz: new Float64Array(n),
-    fo: new Float32Array(n)
+    fo: new Float32Array(n), cc: new Uint8Array(n)
   };
   for (let i = 0; i < n; i++) {
     const a = NEO.a[i], e = NEO.e[i];
@@ -212,6 +239,8 @@ function prepAsteroids() {
     ast.M0[i] = NEO.ma[i] * DEG; ast.ep[i] = NEO.ep[i];
     ast.pha[i] = NEO.pha[i]; ast.ok[i] = 1;
     ast.fo[i] = NEO.fo[i] || 0;
+    const cc = CLASS_ORDER.indexOf(NEO.cls[i]);
+    ast.cc[i] = cc < 0 ? 3 : cc;
   }
 }
 
@@ -378,16 +407,21 @@ function drawSwarm(jd) {
   const simYear = 2000 + (jd - J2000) / 365.25;
   const fresh = [];
   closestIdx = -1; closestD = 1e9; discoveredCount = 0;
+  ast.vis.fill(0);
 
-  // two passes -> one fillStyle each
-  for (let pass = 0; pass < 2; pass++) {
-    const wantPha = pass === 1;
-    if (phaOnly && !wantPha) continue;
-    trailCx.fillStyle = wantPha ? "rgba(255,118,86,0.85)" : "rgba(219,108,84,0.42)";
-    const s = wantPha ? 1.9 : 1.3;
+  // one pass per fill style; depth-scaled point size for 3D feel
+  const passes = colorMode === "class"
+    ? CLASS_COLORS.map((fill, k) => ({ fill, s: 1.6, match: (i) => ast.cc[i] === k }))
+    : [{ fill: "rgba(219,108,84,0.42)", s: 1.3, match: (i) => !ast.pha[i] },
+       { fill: "rgba(255,118,86,0.85)", s: 1.9, match: (i) => ast.pha[i] === 1 }];
+
+  for (const pass of passes) {
+    trailCx.fillStyle = pass.fill;
+    const s = pass.s;
     for (let i = 0; i < ast.n; i++) {
-      if (!ast.ok[i] || ast.pha[i] !== (wantPha ? 1 : 0)) { if (!wantPha) ast.vis[i] = 0; continue; }
-      if (discovery && ast.fo[i] > simYear) { ast.vis[i] = 0; continue; }
+      if (!ast.ok[i] || !pass.match(i)) continue;
+      if (phaOnly && !ast.pha[i]) continue;
+      if (discovery && ast.fo[i] > simYear) continue;
       if (discovery) discoveredCount++;
       let M = (ast.M0[i] + ast.nn[i] * (jd - ast.ep[i])) % (2 * Math.PI);
       const e = ast.e[i];
@@ -401,10 +435,11 @@ function drawSwarm(jd) {
       const dE2 = dx * dx + dy * dy + dz * dz;
       if (dE2 < closestD) { closestD = dE2; closestIdx = i; }
       const q = project(wx, wy, wz);
-      if (!q) { ast.vis[i] = 0; continue; }
+      if (!q) continue;
       ast.vis[i] = 1; ast.sx[i] = q[0]; ast.sy[i] = q[1];
       if (discovery && simYear - ast.fo[i] < 1.5) { fresh.push(i); continue; }
-      trailCx.fillRect(q[0], q[1], s, s);
+      const f = Math.min(2.4, Math.max(0.55, 2.6 / q[2]));
+      trailCx.fillRect(q[0], q[1], s * f, s * f);
     }
   }
 
@@ -525,6 +560,18 @@ function updateCard(jd) {
     (NEO.H[i] != null ? row(t("hmag"), fmt(NEO.H[i], 1)) : "") +
     (NEO.d[i] != null ? row(t("diameter"), `${fmt(NEO.d[i], 2)} km`)
       : NEO.H[i] != null ? row(t("diamEst"), estDiameter(NEO.H[i])) : "");
+
+  // back-of-envelope impact energy: rocky density, CA velocity or 20 km/s typical
+  const dKm = NEO.d[i] != null ? NEO.d[i]
+    : NEO.H[i] != null ? 1329 / Math.sqrt(0.14) * Math.pow(10, -NEO.H[i] / 5) : null;
+  if (dKm) {
+    const v = (ca ? ca[3] : 20) * 1000;
+    const mass = Math.PI / 6 * 2600 * Math.pow(dKm * 1000, 3);
+    const mt = 0.5 * mass * v * v / 4.184e15;
+    const label = mt >= 1000 ? `${fmt(mt / 1000, 1)} Gt` : mt >= 1 ? `${fmt(mt, 0)} Mt` : `${fmt(mt * 1000, 0)} kt`;
+    html += row(t("energy"), `${label} · ${fmtInt(Math.max(1, mt / 0.015))}${t("hiro")}`,
+      mt >= 100 ? "warn" : "");
+  }
   if (ca) {
     const d = new Date(ca[1].replace(/-(\w{3})-/, (m, mon) => "-" + ("0" + (
       ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].indexOf(mon) + 1)).slice(-2) + "-"));
@@ -610,6 +657,15 @@ function applyLang() {
   const tc = document.querySelectorAll("#time-chips .chip");
   tc[0].textContent = t("viewNow"); tc[1].textContent = t("viewDiscovery");
   $("view-label").textContent = t("viewLabel");
+  const cc = document.querySelectorAll("#color-chips .chip");
+  cc[0].textContent = t("colorDanger"); cc[1].textContent = t("colorClass");
+  $("color-label").textContent = t("colorLabel");
+  $("legend").innerHTML = CLASS_ORDER.map((k, j) =>
+    `<span><i style="background:${CLASS_HEX[j]}"></i>${CLASS_NAMES[k]}</span>`).join("");
+  $("btn-tour").textContent = t("tourBtn");
+  $("tour-skip").textContent = t("tourSkip");
+  $("tour-exit").textContent = t("tourExit");
+  if (tourIdx >= 0) $("tour-text").textContent = I18N[lang].tourCaps[tourIdx];
   $("search").placeholder = t("search");
   $("star-label").textContent = t("starLabel");
   $("focus-label").textContent = t("focusLabel");
@@ -733,6 +789,76 @@ function readHash() {
   }
 }
 
+/* ================= guided tour ================= */
+
+function syncChips(rootId, mode) {
+  document.querySelectorAll(`#${rootId} .chip[data-mode]`).forEach((x) =>
+    x.classList.toggle("active", x.dataset.mode === mode));
+}
+
+function setSwarm(m) { swarmMode = m; syncChips("swarm-chips", m); }
+function setStars(m) { starMode = m; syncChips("star-chips", m); }
+function setColor(m) {
+  colorMode = m;
+  syncChips("color-chips", m);
+  $("legend").classList.toggle("open", m === "class");
+}
+
+function gotoApophis() {
+  const i = NEO.des.indexOf("99942");
+  if (i < 0) return;
+  select(i);
+  simDate = new Date("2029-04-01T12:00:00");
+  speedIdx = 0; direction = 1; playing = true;
+  $("speed").value = 0;
+  setFocus(true);
+  cam.dist = 0.35;
+  writeHash();
+}
+
+const TOUR = [
+  () => { setViewMode("now", true); setSwarm("all"); setColor("danger"); setStars("bright");
+          select(-1); setFocus(false); cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 };
+          speedIdx = 2; $("speed").value = 2; playing = true; },
+  () => { setSwarm("pha"); },
+  () => { setSwarm("all"); gotoApophis(); },
+  () => { setViewMode("now", true); const i = NEO.des.indexOf("101955");
+          if (i >= 0) select(i); setFocus(false); cam = { yaw: 0.4, pitch: 0.5, dist: 2.4 }; },
+  () => { select(-1); setFocus(false); cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 }; setViewMode("discovery", true); },
+  () => { setViewMode("now", true); setStars("all"); consOn = true; $("cons-toggle").classList.add("active");
+          select(-1); cam = { yaw: 0.2, pitch: 0.12, dist: 5.2 }; }
+];
+
+function tourApply() {
+  TOUR[tourIdx]();
+  $("tour-text").textContent = I18N[lang].tourCaps[tourIdx];
+  $("tour-dots").innerHTML = TOUR.map((_, k) =>
+    `<i class="${k === tourIdx ? "on" : ""}"></i>`).join("");
+  clearTimeout(tourTimer);
+  tourTimer = setTimeout(tourNext, 13000);
+}
+
+function tourNext() {
+  tourIdx++;
+  if (tourIdx >= TOUR.length) { tourEnd(); return; }
+  tourApply();
+}
+
+function tourEnd() {
+  clearTimeout(tourTimer);
+  tourIdx = -1;
+  $("tour").classList.remove("open");
+  setViewMode("now", true); setSwarm("all"); setColor("danger"); setStars("bright");
+  select(-1); setFocus(false);
+  cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 };
+}
+
+function tourStart() {
+  tourIdx = 0;
+  $("tour").classList.add("open");
+  tourApply();
+}
+
 function setViewMode(m, jump = true) {
   viewMode = m;
   document.querySelectorAll("#time-chips .chip[data-mode]").forEach((x) =>
@@ -823,16 +949,24 @@ $("ticker").addEventListener("click", () => {
   const i = +$("ticker").dataset.idx;
   if (i >= 0) select(i);
 });
-$("btn-apophis").addEventListener("click", () => {
-  const i = NEO.des.indexOf("99942");
-  if (i < 0) return;
-  select(i);
-  simDate = new Date("2029-04-01T12:00:00");
-  speedIdx = 0; direction = 1; playing = true;
-  $("speed").value = 0;
-  setFocus(true);
-  cam.dist = 0.35;
-  writeHash();
+$("btn-apophis").addEventListener("click", gotoApophis);
+chipGroup("color-chips", (m) => setColor(m));
+$("btn-tour").addEventListener("click", () => (tourIdx < 0 ? tourStart() : tourEnd()));
+$("tour-skip").addEventListener("click", tourNext);
+$("tour-exit").addEventListener("click", tourEnd);
+$("btn-shot").addEventListener("click", () => {
+  const c = document.createElement("canvas");
+  c.width = W * dpr; c.height = H * dpr;
+  const x = c.getContext("2d");
+  x.fillStyle = "#0a0e14";
+  x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(starsCv, 0, 0);
+  x.drawImage(trailCv, 0, 0);
+  x.drawImage(topCv, 0, 0);
+  const a = document.createElement("a");
+  a.download = `neo-swarm-${simDate.toISOString().slice(0, 10)}.png`;
+  a.href = c.toDataURL("image/png");
+  a.click();
 });
 
 window.addEventListener("keydown", (e) => {

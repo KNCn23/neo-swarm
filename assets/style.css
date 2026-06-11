@@ -141,6 +141,74 @@ header > * { pointer-events: auto; }
 .sr-row i { font-style: normal; color: var(--warn); }
 .sr-row span { color: var(--text-dim); }
 
+#legend {
+  position: fixed;
+  right: 20px;
+  bottom: 128px;
+  display: none;
+  gap: 12px;
+  font: 11px "JetBrains Mono", monospace;
+  color: var(--text-dim);
+  background: rgba(15, 21, 32, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  backdrop-filter: blur(8px);
+}
+#legend.open { display: flex; }
+#legend span { display: flex; align-items: center; gap: 5px; }
+#legend i {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+#tour {
+  position: fixed;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%) translateY(-16px);
+  width: min(560px, calc(100vw - 32px));
+  background: rgba(15, 21, 32, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+  padding: 16px 18px 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 5;
+}
+#tour.open { opacity: 1; pointer-events: auto; transform: translateX(-50%); }
+#tour-text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text);
+}
+#tour-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+#tour-dots { display: flex; gap: 5px; }
+#tour-dots i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  display: inline-block;
+}
+#tour-dots i.on { background: var(--accent); }
+#tour-foot button {
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 11px "JetBrains Mono", monospace;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+#tour-foot button:hover { color: var(--accent); }
+
 #ticker {
   position: fixed;
   left: 50%;
