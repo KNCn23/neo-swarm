@@ -139,6 +139,8 @@ let consOn = true;
 let viewMode = "now";       // now | discovery
 let colorMode = "danger";   // danger | class
 let tourIdx = -1, tourTimer = null;
+let lastInteract = performance.now();
+const REDUCED_MOTION = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let focusEarth = false;
 let selected = -1;          // asteroid index
 let cam = { yaw: -0.5, pitch: 0.62, dist: 4.2 };
@@ -362,7 +364,7 @@ function drawStars() {
 
 function drawSwarm(jd) {
   trailCx.globalCompositeOperation = "source-over";
-  trailCx.fillStyle = "rgba(10,14,20,0.32)";
+  trailCx.fillStyle = REDUCED_MOTION ? "rgba(10,14,20,1)" : "rgba(10,14,20,0.32)";
   trailCx.fillRect(0, 0, W, H);
   trailCx.globalCompositeOperation = "lighter";
 
@@ -673,7 +675,9 @@ function applyLang() {
   $("ca-title").textContent = t("caTitle");
   $("ca-note").textContent = t("caNote");
   $("hint").textContent = t("hint");
-  $("sources").textContent = t("sources");
+  $("sources").innerHTML =
+    `${t("sources")}<br><a href="https://kncn23.github.io" target="_blank" rel="noopener">kncn23.github.io</a>` +
+    ` · <a href="https://github.com/KNCn23/neo-swarm" target="_blank" rel="noopener">GitHub</a>`;
   $("btn-today").textContent = t("today");
   $("card-watch").textContent = t("watch");
   $("lang-en").classList.toggle("active", lang === "en");
@@ -1006,6 +1010,10 @@ function loop(now) {
     simDate = new Date(simDate.getTime() + SPEEDS[speedIdx] * direction * dt * 86400000);
     if (document.activeElement !== $("date-input")) syncDate();
   }
+  // cinematic idle drift: after 20 s without input, the camera slowly orbits
+  if (!REDUCED_MOTION && tourIdx < 0 && playing && now - lastInteract > 20000) {
+    cam.yaw += 0.0004;
+  }
   const jd = julianDay(simDate);
   camUpdate(jd);
   drawStars();
@@ -1014,6 +1022,12 @@ function loop(now) {
   updateHud(now);
   requestAnimationFrame(loop);
 }
+
+for (const ev of ["pointerdown", "wheel", "keydown", "touchstart"]) {
+  window.addEventListener(ev, () => { lastInteract = performance.now(); }, { passive: true });
+}
+$("menu-toggle").addEventListener("click", () =>
+  document.querySelector("header").classList.toggle("menu-open"));
 
 $("loading").querySelector("span").textContent =
   (navigator.language || "").startsWith("tr") ? I18N.tr.loading : I18N.en.loading;
@@ -1036,6 +1050,11 @@ Promise.all([
   syncDate();
   $("loading").classList.add("done");
   requestAnimationFrame(loop);
+}).catch((err) => {
+  console.error("[neo-swarm] data load failed:", err);
+  $("loading").querySelector("span").textContent = lang === "tr"
+    ? "Veri yüklenemedi — sayfayı yenilemeyi dene."
+    : "Data failed to load — try refreshing the page.";
 });
 
 window.addEventListener("resize", resize);

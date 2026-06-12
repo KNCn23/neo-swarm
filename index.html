@@ -5,13 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NEO Swarm — near-Earth asteroids, live · NASA/JPL data</title>
   <meta name="description" content="The near-Earth asteroid swarm in 3D: thousands of real orbits from NASA/JPL's Small-Body Database, upcoming close approaches, and a real star catalog. EN/TR.">
+  <link rel="canonical" href="https://kncn23.github.io/neo-swarm/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NEO Swarm — near-Earth asteroids, live">
+  <meta property="og:description" content="6,800+ real asteroid orbits from NASA/JPL, the 2029 Apophis flyby, a discovery timeline and the real night sky — in your browser.">
+  <meta property="og:url" content="https://kncn23.github.io/neo-swarm/">
+  <meta property="og:image" content="https://kncn23.github.io/neo-swarm/assets/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://kncn23.github.io/neo-swarm/assets/og-image.jpg">
+  <link rel="preload" href="assets/data/neos.json" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="assets/data/stars.json" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="assets/data/cad.json" as="fetch" crossorigin="anonymous">
+  <link rel="preload" href="assets/data/extras.json" as="fetch" crossorigin="anonymous">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="assets/style.css?v=3">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='2.4' fill='%23ffd27d'/><ellipse cx='8' cy='8' rx='7' ry='4.4' fill='none' stroke='%23ff7a5c' stroke-width='1' transform='rotate(-25 8 8)'/><circle cx='12.8' cy='5.4' r='1.2' fill='%2358e6d9'/></svg>">
 </head>
 <body>
+  <noscript><p style="font-family:monospace;color:#d6e2f0;padding:40px">This visualization needs JavaScript — all orbits are computed in your browser.</p></noscript>
   <canvas id="stars-canvas"></canvas>
   <canvas id="trail-canvas"></canvas>
   <canvas id="top-canvas"></canvas>
@@ -22,6 +35,7 @@
       <h1 id="brand-title"></h1>
       <div id="stats" class="stats"></div>
     </div>
+    <button id="menu-toggle" type="button" aria-label="menu">⚙</button>
     <div class="header-right">
       <div class="chip-row" id="search-row">
         <input id="search" type="search" autocomplete="off" spellcheck="false">
@@ -113,6 +127,6 @@
     <button id="btn-shot" type="button" aria-label="screenshot">📷</button>
   </div>
 
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v=3"></script>
 </body>
 </html>

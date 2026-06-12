@@ -454,12 +454,53 @@ header > * { pointer-events: auto; }
 }
 @keyframes pulse { 50% { opacity: 0.35; } }
 
+#menu-toggle {
+  display: none;
+  border: 1px solid var(--border);
+  background: rgba(15, 21, 32, 0.8);
+  color: var(--text);
+  border-radius: 999px;
+  width: 36px; height: 36px;
+  font-size: 15px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+#sources a { color: var(--text-dim); }
+#sources a:hover { color: var(--accent); }
+
 @media (max-width: 760px) {
-  .stats { display: none; }
-  #brand-title { font-size: 16px; }
+  .stats, .eyebrow, #hint, #sources, #ticker, #legend { display: none; }
+  #brand-title { font-size: 15px; white-space: nowrap; }
+  header { align-items: flex-start; }
+  #menu-toggle { display: block; }
+  .header-right { display: none; }
+  header.menu-open .header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    position: absolute;
+    top: 52px; right: 10px;
+    background: rgba(15, 21, 32, 0.95);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    backdrop-filter: blur(14px);
+  }
   .chip { padding: 4px 9px; font-size: 10px; }
-  #hint, #sources, #ticker { display: none; }
-  #search { width: 150px; }
-  #ca-panel { width: calc(100vw - 24px); left: 12px; }
-  #card { top: auto; bottom: 130px; right: 12px; left: 12px; width: auto; }
+  #search { width: 196px; }
+  #controls {
+    gap: 7px;
+    padding: 8px 12px;
+    font-size: 11px;
+    bottom: 10px;
+  }
+  #controls button { padding: 5px 9px; }
+  #speed { width: 78px; }
+  #date-input, #btn-shot { display: none; }
+  #ca-panel { top: 52px; bottom: auto; left: 10px; width: calc(100vw - 20px); }
+  #ca-body { margin: 8px 0 0; }
+  #card { top: auto; bottom: 120px; right: 12px; left: 12px; width: auto; }
+  #tour { top: 56px; }
 }

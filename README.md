@@ -9,6 +9,8 @@
 
 **[Enter the swarm →](https://kncn23.github.io/neo-swarm/)**
 
+<a href="https://kncn23.github.io/neo-swarm/"><img src="assets/og-image.jpg" alt="Live view — thousands of asteroid motion trails swirling around the Sun, with the inner planets labeled" width="100%"></a>
+
 </div>
 
 There are **42,025 known near-Earth asteroids**. This project shows them as they actually move:
